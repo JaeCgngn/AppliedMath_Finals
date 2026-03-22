@@ -42,6 +42,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public float groundWidth = 200f;
     public float groundDepth = 200f;
 
+    public List<Powerup> powerups = new List<Powerup>();
+
     void Start()
     {
         // Find or create camera if not assigned
@@ -60,7 +62,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
         GenerateRandomBoxes();
     }
     
-    void SetupCamera()
+    void SetupCamera() 
     {
         if (cameraFollow == null)
         {
@@ -245,11 +247,11 @@ public class EnhancedMeshGenerator : MonoBehaviour
         RenderBoxes();
 
         //Collision Check
-        foreach(var enemy in enemies)
-        {
-            if (CollisionManager.Instance.CheckOverlap(playerID, enemy.position, enemy.size))
-            player.TakeDamage(1);
-        }
+        // foreach(var enemy in enemies)
+        // {
+        //     if (CollisionManager.Instance.CheckOverlap(playerID, enemy.position, enemy.size))
+        //     player.TakeDamage(1);
+        // }
 
 
     }
@@ -262,24 +264,30 @@ public class EnhancedMeshGenerator : MonoBehaviour
         Matrix4x4 playerMatrix = matrices[colliderIds.IndexOf(playerID)];
         DecomposeMatrix(playerMatrix, out Vector3 pos, out Quaternion rot, out Vector3 scale);
         
-        // Reset velocity.y when grounded
-        if (isGrounded)
-        {
-            playerVelocity.y = 0;
-        }
-        
-        // Apply gravity
+        //Gravity
         if (!isGrounded)
         {
-            playerVelocity.y -= gravity * Time.deltaTime;
+            float gravityScale = playerVelocity.y > 0 ? 9.8f : 4.5f; 
+            playerVelocity.y -= gravityScale * Time.deltaTime;
+        }
+
+        //Jump
+        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
+        {
+            playerVelocity.y = 12f; 
+            isGrounded = false;
         }
         
         // Get horizontal input
         float horizontal = 0;
         if (Input.GetKey(KeyCode.A)) horizontal -= 1;
         if (Input.GetKey(KeyCode.D)) horizontal += 1;
-        
+
         // Update player position based on input
+        if (!isGrounded)
+        {
+            horizontal *= 0.5f;
+        } 
         Vector3 newPos = pos;
         newPos.x += horizontal * movementSpeed * Time.deltaTime;
         
@@ -383,3 +391,4 @@ public class EnhancedMeshGenerator : MonoBehaviour
         CollisionManager.Instance.UpdateMatrix(id, boxMatrix);
     }
 }
+
