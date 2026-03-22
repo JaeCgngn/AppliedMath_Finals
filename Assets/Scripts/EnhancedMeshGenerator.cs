@@ -25,6 +25,9 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
     public float fireballSpeed = 12f;
     public Material powerupMaterial;
+    bool hasFireballPower = false;
+    float fireballTimer = 0f;
+    float fireballDuration = 5f; 
 
 
 
@@ -280,6 +283,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
         RenderFireballs();
         RenderPowerups();
         RenderBoxes();
+
+        HandleFireballPower();
 
         //Collision Check
         // foreach(var enemy in enemies)
@@ -646,8 +651,9 @@ public class EnhancedMeshGenerator : MonoBehaviour
                 break;
 
             case "fireball":
-                SpawnFireball();
-                break;
+            hasFireballPower = true;
+            fireballTimer = fireballDuration;
+            break;
         }
 
         // Disable
@@ -666,19 +672,37 @@ public class EnhancedMeshGenerator : MonoBehaviour
             if (!p.active) continue; // Only draw active powerups
 
             // Choose color or material based on type
-            Material mat = powerupMaterial; // default material
+            Material mat = new Material(powerupMaterial); // default material
             if (p.type == "life") mat.color = Color.green;
             else if (p.type == "fireball") mat.color = Color.red;
 
-            // Create a transformation matrix for position, rotation, and scale
-            Matrix4x4 matrix = Matrix4x4.TRS(
+            Matrix4x4 matrix = Matrix4x4.TRS( 
                 p.position,
                 Quaternion.identity,
-                Vector3.one * 0.6f
+                Vector3.one * 0.6f 
         );
 
-        Graphics.DrawMesh(cubeMesh, matrix, mat, 0);
+        Graphics.DrawMesh(cubeMesh, matrix, mat, 0); 
         }
+    }
+    
+    public void AddRandomPowerup()
+    {
+        // Random position inside your bounds
+        Vector3 position = new Vector3(
+            Random.Range(minX, maxX),
+            Random.Range(minY, maxY),
+            constantZPosition
+        );
+
+        // Randomly choose a type
+        string[] types = { "life", "fireball" }; // you can add more later
+        string type = types[Random.Range(0, types.Length)];
+
+        // Call your existing CreatePowerup method
+        CreatePowerup(position, type);
+
+        Debug.Log($"Spawned powerup '{type}' at {position}");
     }
     //===================================================================================================================
     //Fireball Spawner
@@ -750,24 +774,25 @@ public class EnhancedMeshGenerator : MonoBehaviour
         }
     }
 
-    public void AddRandomPowerup()
+    void HandleFireballPower()
     {
-        // Random position inside your bounds
-        Vector3 position = new Vector3(
-            Random.Range(minX, maxX),
-            Random.Range(minY, maxY),
-            constantZPosition
-        );
+        if (!hasFireballPower) return;
 
-        // Randomly choose a type
-        string[] types = { "life", "fireball" }; // you can add more later
-        string type = types[Random.Range(0, types.Length)];
+        fireballTimer -= Time.deltaTime;
 
-        // Call your existing CreatePowerup method
-        CreatePowerup(position, type);
+        if (Input.GetMouseButtonDown(0))
+        {
+            SpawnFireball();
+        }
 
-        Debug.Log($"Spawned powerup '{type}' at {position}");
+        if (fireballTimer <= 0f)
+        {
+            hasFireballPower = false;
+        }
+
     }
+
+    
     
 
 }
