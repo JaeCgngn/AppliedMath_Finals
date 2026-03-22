@@ -12,6 +12,7 @@ public class AABBBounds
     public bool IsPlayer { get; private set; }
     public Matrix4x4 Matrix { get; set; }
 
+
     public AABBBounds(Vector3 center, Vector3 size, int id, bool isPlayer = false)
     {
         ID = id;
@@ -52,6 +53,7 @@ public class CollisionManager : MonoBehaviour
             return _instance;
         }
     }
+
 
     private Dictionary<int, AABBBounds> _colliders = new Dictionary<int, AABBBounds>();
     private int nextID = 0;
@@ -118,4 +120,42 @@ public class CollisionManager : MonoBehaviour
         }
         return Matrix4x4.identity;
     }
+
+
+    //===================================================================================================================
+    //Visualize Colliders
+    //===================================================================================================================
+
+    public Dictionary<int, AABBBounds> GetAllColliders()
+    {
+        return _colliders;
+    }
+    public bool showBoxes = true;
+    void OnDrawGizmos()
+    {
+        if (showBoxes) DrawCollisionBoxes();
+    }
+
+
+    void DrawCollisionBoxes()
+    {
+        var colliders = CollisionManager.Instance.GetAllColliders();
+
+        foreach (var kvp in colliders)
+        {
+            AABBBounds bounds = kvp.Value;
+
+            // Color coding
+            if (bounds.IsPlayer)
+                Gizmos.color = Color.blue;
+            else
+                Gizmos.color = Color.red;
+
+            Gizmos.DrawWireCube(bounds.Center, bounds.Size);
+        }
+    }
+
+
+
+
 }
