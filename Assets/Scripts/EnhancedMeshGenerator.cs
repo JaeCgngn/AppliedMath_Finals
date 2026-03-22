@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using UnityEngine;
 using Matrix4x4 = UnityEngine.Matrix4x4;
 using Quaternion = UnityEngine.Quaternion;
@@ -12,8 +13,11 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public Material material;
     public int instanceCount = 100;
     private Mesh cubeMesh;
-    private List<Matrix4x4> matrices = new List<Matrix4x4>();
-    private List<int> colliderIds = new List<int>();
+    private List<Matrix4x4> matrices = new List<Matrix4x4>(); //
+    private List<int> colliderIds = new List<int>(); // 
+
+
+    public List<Powerup> powerups = new List<Powerup>(); //
 
     [Header("Box Dimensions")]
 
@@ -55,9 +59,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public bool showGround = true;
     public bool showSpawnRange = true;
     public bool showBoxes = true;
-
-
-    public List<Powerup> powerups = new List<Powerup>();
 
     void Start()
     {
@@ -117,17 +118,17 @@ public class EnhancedMeshGenerator : MonoBehaviour
         // Create 8 vertices for the cube (corners)
         Vector3[] vertices = new Vector3[8]
         {
-            // Bottom face vertices
-            new Vector3(0, 0, 0),       // Bottom front left - 0
-            new Vector3(width, 0, 0),   // Bottom front right - 1
-            new Vector3(width, 0, depth),// Bottom back right - 2
-            new Vector3(0, 0, depth),   // Bottom back left - 3
-            
-            // Top face vertices
-            new Vector3(0, height, 0),       // Top front left - 4
-            new Vector3(width, height, 0),   // Top front right - 5
-            new Vector3(width, height, depth),// Top back right - 6
-            new Vector3(0, height, depth)    // Top back left - 7
+               // Bottom face
+    new Vector3(-width/2, -height/2, -depth/2),
+    new Vector3(width/2, -height/2, -depth/2),
+    new Vector3(width/2, -height/2, depth/2),
+    new Vector3(-width/2, -height/2, depth/2),
+
+    // Top face
+    new Vector3(-width/2, height/2, -depth/2),
+    new Vector3(width/2, height/2, -depth/2),
+    new Vector3(width/2, height/2, depth/2),
+    new Vector3(-width/2, height/2, depth/2)
         };
 
         // Triangles for the 6 faces (2 triangles per face)
@@ -228,7 +229,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
             );
 
             // Random rotation only around Z axis
-            Quaternion rotation = Quaternion.identity;
+            Quaternion rotation = Quaternion.Euler(0, 0, Random.Range(0f, 360f));
 
             // Random non-uniform scale - different for each dimension
             Vector3 scale = new Vector3(
@@ -257,7 +258,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
     {
         //PLayer INput
         UpdatePlayer();
-
 
         RenderBoxes();
 
@@ -348,6 +348,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
             cameraFollow.SetPlayerPosition(pos);
         }
     }
+
 
     bool CheckCollisionAt(int id, Vector3 position)
     {
