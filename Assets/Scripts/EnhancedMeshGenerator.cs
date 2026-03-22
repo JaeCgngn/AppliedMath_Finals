@@ -17,11 +17,21 @@ public class EnhancedMeshGenerator : MonoBehaviour
     private List<int> colliderIds = new List<int>(); // 
 
 
-    public List<Powerup> powerups = new List<Powerup>(); //
+    public List<Enemy> enemies = new List<Enemy>(); 
+
+    [Header("POwerUPs")]
+    public List<Fireball> fireballs = new List<Fireball>();
+    public List<Powerup> powerups = new List<Powerup>();
+
+    public float fireballSpeed = 12f;
+    public Material powerupMaterial;
+
+
+
 
     [Header("Box Dimensions")]
 
-    public float width = 1f;
+    public float width = 1f; 
     public float height = 1f;
     public float depth = 1f;
 
@@ -33,6 +43,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     private int playerID = -1;
     private Vector3 playerVelocity = Vector3.zero;
     private bool isGrounded = false;
+    public int playerHP = 5;
 
     [Header("Camera Settings")]
     // Camera reference
@@ -76,6 +87,10 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
         // Set up random boxes
         GenerateRandomBoxes();
+
+        // Create Enemy
+        CreateEnemy(new Vector3(5, 5, constantZPosition));
+        CreateEnemy(new Vector3(-10, 3, constantZPosition));
     }
 
     void SetupCamera()
@@ -257,8 +272,13 @@ public class EnhancedMeshGenerator : MonoBehaviour
     void Update()
     {
         //PLayer INput
-        UpdatePlayer();
+        UpdatePlayer(); 
+        UpdateEnemies();
+        UpdatePowerups();
+        UpdateFireballs(); 
 
+        RenderFireballs();
+        RenderPowerups();
         RenderBoxes();
 
         //Collision Check
@@ -345,7 +365,9 @@ public class EnhancedMeshGenerator : MonoBehaviour
         // Update camera to follow player
         if (cameraFollow != null)
         {
-            cameraFollow.SetPlayerPosition(pos);
+            Matrix4x4 camPlayerMatrix = matrices[colliderIds.IndexOf(playerID)];
+            DecomposeMatrix(camPlayerMatrix, out Vector3 camPlayerPos, out _, out _);
+            cameraFollow.SetPlayerPosition(camPlayerPos);
         }
     }
 
@@ -417,6 +439,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
         if (showGround) DrawGroundMeshGizmos();
         if (showSpawnRange) DrawSpawnRange();
         if (showBoxes) DrawAllBoxesMeshGizmos();
+        DrawAllPowerupsGizmos();
     }
 
     void DrawGroundMeshGizmos()
@@ -464,5 +487,288 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
 
     }
+
+    void DrawAllPowerupsGizmos()
+    {
+        if (powerups == null || powerups.Count == 0) return;
+
+        foreach (var p in powerups)
+        {
+            if (!p.active) continue;
+
+            // Choose color based on type
+            if (p.type == "life") Gizmos.color = Color.green;
+            else if (p.type == "fireball") Gizmos.color = Color.red;
+            else Gizmos.color = Color.magenta; 
+
+            Gizmos.matrix = Matrix4x4.TRS(p.position, Quaternion.identity, Vector3.one * 0.6f);
+            Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+        }
+
+        Gizmos.matrix = Matrix4x4.identity; 
+    }
+
+    //===================================================================================================================
+    //Enemy Functions
+    //===================================================================================================================
+
+    void CreateEnemy(Vector3 position)
+    {
+        Vector3 scale = Vector3.one;
+
+        int id = CollisionManager.Instance.RegisterCollider(
+            position,
+            new Vector3(width * scale.x, height * scale.y, depth * scale.z),
+            false
+        );
+
+        Matrix4x4 matrix = Matrix4x4.TRS(position, Quaternion.identity, scale);
+
+        matrices.Add(matrix);
+        colliderIds.Add(id);
+
+        int matrixIndex = matrices.Count - 1;
+
+        Enemy enemy = new Enemy(id, position, new Vector3(width, height, depth), 5f);
+        enemy.matrixIndex = matrixIndex;
+
+        enemies.Add(enemy);
+
+        CollisionManager.Instance.UpdateMatrix(id, matrix);
+    }
+
+    void UpdateEnemies()
+    {
+        foreach (var e in enemies)
+        {
+            e.UpdateMovement(Time.deltaTime);
+            e.position.x += e.speed * Time.deltaTime;
+
+             if (!e.isGrounded)
+            {
+                e.velocity.y -= gravity * Time.deltaTime;
+            }
+            else
+            {
+                e.velocity.y = 0;
+            }
+
+            Vector3 newPos = e.position;
+            newPos.y += e.velocity.y * Time.deltaTime;
+
+            // Check vertical collision (ground/platforms)
+            if (CollisionManager.Instance.CheckCollision(e.id, newPos, out _))
+            {
+                if (e.velocity.y < 0)
+                    e.isGrounded = true;
+
+                e.velocity.y = 0;
+            }
+            else
+            {
+                e.position.y = newPos.y;
+                e.isGrounded = false;
+            }
+
+            // Update matrix
+            Matrix4x4 matrix = matrices[e.matrixIndex];
+            DecomposeMatrix(matrix, out _, out Quaternion rot, out Vector3 scale);
+
+            Matrix4x4 newMatrix = Matrix4x4.TRS(e.position, rot, scale);
+            matrices[e.matrixIndex] = newMatrix;
+
+            // Update collision
+            CollisionManager.Instance.UpdateCollider(e.id, e.position, e.size);
+            CollisionManager.Instance.UpdateMatrix(e.id, newMatrix);
+
+            // Damage player
+            if (CollisionManager.Instance.CheckOverlap(playerID, e.position, e.size))
+            {
+                Debug.Log("Player Damaged");
+                playerHP--;
+            }
+        }
+    }
+    //===================================================================================================================
+    //Power Up
+    //===================================================================================================================
+    void CreatePowerup(Vector3 position, string type)
+    {
+        Vector3 scale = Vector3.one * 0.8f;
+
+        int id = CollisionManager.Instance.RegisterCollider(
+            position,
+            new Vector3(width * scale.x, height * scale.y, depth * scale.z),
+            false
+        );
+
+        Matrix4x4 matrix = Matrix4x4.TRS(position, Quaternion.identity, scale);
+
+        matrices.Add(matrix);
+        colliderIds.Add(id);
+
+        int matrixIndex = matrices.Count - 1;
+
+        Powerup p = new Powerup(
+            id,
+            position,
+            new Vector3(width * scale.x, height * scale.y, depth * scale.z),
+            type,
+            matrixIndex
+        );
+
+        powerups.Add(p);
+
+        CollisionManager.Instance.UpdateMatrix(id, matrix);
+    }
+
+    void UpdatePowerups()
+    {
+        foreach (var p in powerups)
+        {
+            if (!p.active) continue;
+
+            if (CollisionManager.Instance.CheckOverlap(playerID, p.position, p.size))
+            {
+                ActivatePowerup(p);
+            }
+        }
+    }
+
+    void ActivatePowerup(Powerup p)
+    {
+        if (!p.active) return;
+
+        switch (p.type)
+        {
+            case "life":
+                playerHP++;
+                break;
+
+            case "fireball":
+                SpawnFireball();
+                break;
+        }
+
+        // Disable
+        p.active = false;
+
+        matrices[p.matrixIndex] = Matrix4x4.TRS(p.position, Quaternion.identity, Vector3.zero);
+        CollisionManager.Instance.RemoveCollider(p.id);
+    }
+
+    void RenderPowerups()
+    {
+        if (powerups == null || cubeMesh == null || powerupMaterial == null) return;
+
+        foreach (var p in powerups)
+        {
+            if (!p.active) continue; // Only draw active powerups
+
+            // Choose color or material based on type
+            Material mat = powerupMaterial; // default material
+            if (p.type == "life") mat.color = Color.green;
+            else if (p.type == "fireball") mat.color = Color.red;
+
+            // Create a transformation matrix for position, rotation, and scale
+            Matrix4x4 matrix = Matrix4x4.TRS(
+                p.position,
+                Quaternion.identity,
+                Vector3.one * 0.6f
+        );
+
+        Graphics.DrawMesh(cubeMesh, matrix, mat, 0);
+        }
+    }
+    //===================================================================================================================
+    //Fireball Spawner
+    //===================================================================================================================
+
+    void SpawnFireball()
+    {
+        Matrix4x4 playerMatrix = matrices[colliderIds.IndexOf(playerID)];
+        DecomposeMatrix(playerMatrix, out Vector3 pos, out _, out _);
+
+        Vector3 scale = Vector3.one * 0.5f;
+
+        Matrix4x4 matrix = Matrix4x4.TRS(pos, Quaternion.identity, scale);
+
+        matrices.Add(matrix);
+        int matrixIndex = matrices.Count - 1;
+
+        Fireball fb = new Fireball(
+            pos,
+            new Vector3(width * scale.x, height * scale.y, depth * scale.z),
+            fireballSpeed,
+            matrixIndex
+        );
+
+        fireballs.Add(fb);
+    }
+
+    void UpdateFireballs()
+    {
+        for (int i = 0; i < fireballs.Count; i++)
+        {
+            Fireball fb = fireballs[i];
+
+            // Move forward (right)
+            fb.position += Vector3.right * fb.speed * Time.deltaTime;
+
+            // Check collision with enemies
+            foreach (var e in enemies)
+            {
+                if (CollisionManager.Instance.CheckOverlap(e.id, fb.position, fb.size))
+                {
+                    // Kill enemy
+                    CollisionManager.Instance.RemoveCollider(e.id);
+                    matrices[e.matrixIndex] = Matrix4x4.TRS(e.position, Quaternion.identity, Vector3.zero);
+
+                    // Remove fireball
+                    matrices[fb.matrixIndex] = Matrix4x4.TRS(fb.position, Quaternion.identity, Vector3.zero);
+                    fireballs.RemoveAt(i);
+                    i--;
+                    break;
+                }
+            }
+
+            // Update fireball matrix
+            if (i >= 0 && i < fireballs.Count)
+            {
+                Matrix4x4 newMatrix = Matrix4x4.TRS(fb.position, Quaternion.identity, Vector3.one * 0.5f);
+                matrices[fb.matrixIndex] = newMatrix;
+            }
+        }
+    }
+
+    void RenderFireballs()
+    {
+        foreach (var fb in fireballs)
+        {
+            Matrix4x4 matrix = Matrix4x4.TRS(fb.position, Quaternion.identity, Vector3.one * 0.5f);
+            Graphics.DrawMesh(cubeMesh, matrix, powerupMaterial, 0);
+        }
+    }
+
+    public void AddRandomPowerup()
+    {
+        // Random position inside your bounds
+        Vector3 position = new Vector3(
+            Random.Range(minX, maxX),
+            Random.Range(minY, maxY),
+            constantZPosition
+        );
+
+        // Randomly choose a type
+        string[] types = { "life", "fireball" }; // you can add more later
+        string type = types[Random.Range(0, types.Length)];
+
+        // Call your existing CreatePowerup method
+        CreatePowerup(position, type);
+
+        Debug.Log($"Spawned powerup '{type}' at {position}");
+    }
+    
+
 }
 

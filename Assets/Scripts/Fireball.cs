@@ -1,20 +1,18 @@
 using UnityEngine;
+
 [System.Serializable]
-public class Powerup 
+public class Fireball
 {
-    public int id;
     public Vector3 position;
     public Vector3 size;
-    public string type; 
-    public bool active = true;
+    public float speed;
     public int matrixIndex;
 
-    public Powerup(int id, Vector3 pos, Vector3 size, string type, int matrixIndex)
+    public Fireball(Vector3 pos, Vector3 size, float speed, int matrixIndex)
     {
-        this.id = id;
         this.position = pos;
         this.size = size;
-        this.type = type;
+        this.speed = speed;
         this.matrixIndex = matrixIndex;
     }
 }

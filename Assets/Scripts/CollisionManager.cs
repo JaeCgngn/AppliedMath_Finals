@@ -155,6 +155,20 @@ public class CollisionManager : MonoBehaviour
         }
     }
 
+    //===================================================================================================================
+    //Checking Colliders
+    //===================================================================================================================
+
+    public bool CheckOverlap(int id, Vector3 otherPos, Vector3 otherSize)
+    {
+        if (!_colliders.TryGetValue(id, out AABBBounds a))
+            return false;
+
+        // Create temporary bounds for the other object
+        AABBBounds temp = new AABBBounds(otherPos, otherSize, -1);
+
+        return a.Intersects(temp);
+    }
 
 
 
