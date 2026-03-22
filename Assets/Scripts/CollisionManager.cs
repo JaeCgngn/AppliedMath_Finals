@@ -12,11 +12,15 @@ public class AABBBounds
     public bool IsPlayer { get; private set; }
     public Matrix4x4 Matrix { get; set; }
 
+    public bool IsTrigger { get; private set; }
 
-    public AABBBounds(Vector3 center, Vector3 size, int id, bool isPlayer = false)
+
+
+    public AABBBounds(Vector3 center, Vector3 size, int id, bool isTrigger = false, bool isPlayer = false)
     {
         ID = id;
         IsPlayer = isPlayer;
+        IsTrigger = isTrigger;
         UpdateBounds(center, size);
     }
 
@@ -58,10 +62,10 @@ public class CollisionManager : MonoBehaviour
     private Dictionary<int, AABBBounds> _colliders = new Dictionary<int, AABBBounds>();
     private int nextID = 0;
 
-    public int RegisterCollider(Vector3 center, Vector3 size, bool isPlayer = false)
+    public int RegisterCollider(Vector3 center, Vector3 size, bool isTrigger = false)
     {
         int id = nextID++;
-        _colliders[id] = new AABBBounds(center, size, id, isPlayer);
+        _colliders[id] = new AABBBounds(center, size, id, isTrigger);
         return id;
     }
 
@@ -95,13 +99,14 @@ public class CollisionManager : MonoBehaviour
         if (!_colliders.TryGetValue(id, out AABBBounds current))
             return false;
 
-        // Create a temporary bounds for collision check
         AABBBounds temp = new AABBBounds(newCenter, current.Size, -1);
 
         bool collided = false;
         foreach (var kvp in _colliders)
         {
-            if (kvp.Key == id) continue; // Skip self-collision
+            if (kvp.Key == id) continue; // Skip self
+
+            if (kvp.Value.IsTrigger) continue;
 
             if (temp.Intersects(kvp.Value))
             {
@@ -120,6 +125,17 @@ public class CollisionManager : MonoBehaviour
         }
         return Matrix4x4.identity;
     }
+
+    public bool CheckOverlap(int id, Vector3 otherPos, Vector3 otherSize)
+    {
+        if (!_colliders.TryGetValue(id, out AABBBounds a))
+            return false;
+
+        AABBBounds temp = new AABBBounds(otherPos, otherSize, -1);
+
+        return a.Intersects(temp);
+    }
+
 
 
     //===================================================================================================================
