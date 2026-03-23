@@ -567,7 +567,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1548962865}
         m_TargetAssemblyTypeName: EnhancedMeshGenerator, Assembly-CSharp
-        m_MethodName: AddRandomBox
+        m_MethodName: AddRandomPowerup
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -1119,6 +1119,8 @@ MonoBehaviour:
   hitStunTimer: 0
   enemyCount: 5
   enemySpeed: 2
+  matLife: {fileID: 2100000, guid: 9c5c3a8082000424aa06345d89477b5d, type: 2}
+  matFireball: {fileID: 2100000, guid: 7b3f85c3e8b044f4db52e8509309568b, type: 2}
   endZonePosition: {x: 200, y: 0, z: 0}
   endZoneSize: {x: 3, y: 20, z: 3}
   showEndZone: 1

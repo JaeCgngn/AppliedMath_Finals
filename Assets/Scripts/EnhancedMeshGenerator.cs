@@ -15,7 +15,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
     private Mesh cubeMesh;
     private List<Matrix4x4> matrices = new List<Matrix4x4>(); //
     private List<int> colliderIds = new List<int>(); // 
-    public List<Powerup> powerups = new List<Powerup>(); //
 
     [Header("Box Dimensions")]
     public float width = 1f;
@@ -45,6 +44,24 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public float enemySpeed = 2f;
     private List<int> enemyIDs = new List<int>();
     private Dictionary<int, Vector3> enemyVelocities = new Dictionary<int, Vector3>();
+
+
+    [Header("Powerup Settings")]
+
+    public Material matLife;
+    public Material matFireball;
+
+    private List<int> powerupIDs = new List<int>();
+    private List<Matrix4x4> powerupMatrices = new List<Matrix4x4>();
+    private List<Material> powerupMaterials = new List<Material>();
+    public enum PowerupType
+    {
+        Life,
+        Fireball
+    }
+
+
+    
 
     [Header("End Zone")]
     public Vector3 endZonePosition = new Vector3(20f, 0f, 0f);
@@ -100,6 +117,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
         GenerateRandomBoxes();
 
         CreateEndZone();
+
     }
     void SetupCamera()
     {
@@ -215,7 +233,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
         CollisionManager.Instance.UpdateMatrix(groundID, groundMatrix);
     }
 
-
     void GenerateRandomBoxes()
     {
         // Create random boxes (excluding player and ground)
@@ -268,6 +285,12 @@ public class EnhancedMeshGenerator : MonoBehaviour
         UpdatePlayer();
         RenderBoxes();
         UpdateEnemies();
+
+        //Powerups rendering
+        RenderPowerups();
+
+        //Player picking up power ups
+        CheckPowerupPickup();
     }
 
     //=========================================================================================================================
@@ -418,7 +441,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
             Graphics.DrawMeshInstanced(cubeMesh, 0, material, batchMatrices, batchSize);
         }
     }
-
 
     //=========================================================================================================================
     // Obstacles
@@ -588,6 +610,137 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
         return overlapX && overlapY && overlapZ;
     }
+    //=========================================================================================================================
+    // Power Ups Settings
+    //=========================================================================================================================
+    public void AddRandomPowerup()
+    {
+        Vector3 position = new Vector3(
+            Random.Range(minX, maxX),
+            Random.Range(minY, maxY),
+            constantZPosition
+        );
+
+        // Random powerup type
+        PowerupType randomType = (PowerupType)Random.Range(0, System.Enum.GetValues(typeof(PowerupType)).Length);
+
+        Debug.Log($"Adding powerup {randomType} at position: {position}");
+
+        Quaternion rotation = Quaternion.identity;
+
+        // Size for Powerups
+        Vector3 scale = Vector3.one * Random.Range(0.5f, 1.2f);
+
+        
+        Material mat = null;
+
+        if (randomType == PowerupType.Fireball) //fireball spawn settings
+        {
+            scale *= 1.2f; 
+            mat = matFireball;
+        }
+        else if (randomType == PowerupType.Life) //life spawn settings
+        {
+            scale *= 1.2f;
+            mat = matLife;
+        }
+
+        // Register collider
+        int id = CollisionManager.Instance.RegisterCollider(
+            position,
+            new Vector3(width * scale.x, height * scale.y, depth * scale.z),
+            true 
+        );
+
+        Matrix4x4 matrix = Matrix4x4.TRS(position, rotation, scale);
+
+        powerupMatrices.Add(matrix);
+        powerupIDs.Add(id);
+        powerupMaterials.Add(mat);
+
+        // Map to CollisionManager powerupType
+        CollisionManager.PowerupType cmType = (randomType == PowerupType.Fireball) ? 
+            CollisionManager.PowerupType.Fireball : CollisionManager.PowerupType.Life;
+        
+        CollisionManager.Instance.SetPowerupType(id, cmType);
+        CollisionManager.Instance.UpdateMatrix(id, matrix);
+    }
+
+    void RenderPowerups()
+    {
+        // Batch Life power-ups
+        List<Matrix4x4> lifeMatrices = new List<Matrix4x4>();
+        List<Matrix4x4> fireballMatrices = new List<Matrix4x4>();
+
+        for (int i = 0; i < powerupIDs.Count; i++)
+        {
+            if (powerupMaterials[i] == matLife)
+                lifeMatrices.Add(powerupMatrices[i]);
+            else
+                fireballMatrices.Add(powerupMatrices[i]);
+        }
+
+        Graphics.DrawMeshInstanced(cubeMesh, 0, matLife, lifeMatrices.ToArray());
+        Graphics.DrawMeshInstanced(cubeMesh, 0, matFireball, fireballMatrices.ToArray());
+    }
+
+    //Checking the colliders of power up to player
+    void CheckPowerupPickup()
+    {
+        if (playerID == -1 || powerupIDs.Count == 0) return;
+
+        int playerIndex = colliderIds.IndexOf(playerID);
+        Vector3 playerPos = matrices[playerIndex].GetPosition();
+        Vector3 playerScale = matrices[playerIndex].lossyScale;
+
+        // Use a reverse loop because we may remove items
+        for (int i = powerupIDs.Count - 1; i >= 0; i--)
+        {
+            int powerupID = powerupIDs[i];
+            int powerupIndex = colliderIds.IndexOf(powerupID);
+            if (powerupIndex < 0) continue;
+
+            Vector3 powerupPos = matrices[powerupIndex].GetPosition();
+            Vector3 powerupScale = matrices[powerupIndex].lossyScale;
+
+            //AABB collision check
+            bool overlapX = Mathf.Abs(powerupPos.x - playerPos.x) < (powerupScale.x + playerScale.x) / 2f;
+            bool overlapY = Mathf.Abs(powerupPos.y - playerPos.y) < (powerupScale.y + playerScale.y) / 2f;
+            bool overlapZ = Mathf.Abs(powerupPos.z - playerPos.z) < (powerupScale.z + playerScale.z) / 2f;
+
+            if (overlapX && overlapY && overlapZ)
+            {
+                // Player collected the power-up
+                Debug.Log("Power-up collected! ID: " + powerupID);
+                CollisionManager.PowerupType type = CollisionManager.Instance.GetPowerupType(powerupID);
+
+                switch (type)
+                {
+                    case CollisionManager.PowerupType.Life:
+                        playerHealth++;
+                        Debug.Log("Life collected! Health increased: " + playerHealth);
+                        break;
+
+                    case CollisionManager.PowerupType.Fireball:
+                        Debug.Log("Fireball power-up collected!");
+                        // fireball effect here
+                        break;
+                }
+
+                powerupIDs.RemoveAt(i);
+                powerupMatrices.RemoveAt(i);
+                powerupMaterials.RemoveAt(i);
+
+                CollisionManager.Instance.RemoveCollider(powerupID);
+            }
+        }
+    }
+
+
+
+
+
+
 
     //=========================================================================================================================
     // Ending Objective

@@ -15,6 +15,9 @@ public class AABBBounds
     public bool IsTrigger { get; private set; }
 
 
+    
+
+
 
     public AABBBounds(Vector3 center, Vector3 size, int id, bool isTrigger = false, bool isPlayer = false)
     {
@@ -43,6 +46,12 @@ public class AABBBounds
 
 public class CollisionManager : MonoBehaviour
 {
+    //Power Up Settings -- Get Power up type
+    private Dictionary<int, PowerupType> powerupTypes = new Dictionary<int, PowerupType>();
+        public enum PowerupType
+    {
+        Life, Fireball
+    }
     private static CollisionManager _instance;
     public static CollisionManager Instance
     {
@@ -136,7 +145,23 @@ public class CollisionManager : MonoBehaviour
         return a.Intersects(temp);
     }
 
+    //===================================================================================================================
+    //Power Up Data and Settings
+    //===================================================================================================================
 
+    public void SetPowerupType(int id, PowerupType type)
+    {
+        powerupTypes[id] = type;
+    }
+
+    public PowerupType GetPowerupType(int id)
+    {
+        if (powerupTypes.TryGetValue(id, out PowerupType type))
+            return type;
+
+        Debug.LogWarning($"Powerup type not found for ID: {id}");
+        return PowerupType.Life; // fallback
+    }
 
     //===================================================================================================================
     //Visualize Colliders
