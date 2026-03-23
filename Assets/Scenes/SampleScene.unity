@@ -271,7 +271,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   offset: {x: 0, y: 2, z: -10}
   smoothSpeed: 0.125
-  useConstraints: 1
+  useConstraints: 0
   xConstraint: {x: -100, y: 200}
   yConstraint: {x: -50, y: 100}
   followX: 1
@@ -1106,7 +1106,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   material: {fileID: 2100000, guid: 106fe088a043891468d7fe3daef900db, type: 2}
   instanceCount: 1
-  powerups: []
   width: 1
   height: 1
   depth: 1
@@ -1117,6 +1116,12 @@ MonoBehaviour:
   playerHitTimer: 0
   hitStunDuration: 1
   hitStunTimer: 0
+  hasFireball: 0
+  fireballSpeed: 10
+  fireballMaterial: {fileID: 2100000, guid: 7b3f85c3e8b044f4db52e8509309568b, type: 2}
+  fireballDuration: 10
+  fireCooldown: 0.3
+  fireTimer: 5
   enemyCount: 5
   enemySpeed: 2
   matLife: {fileID: 2100000, guid: 9c5c3a8082000424aa06345d89477b5d, type: 2}

@@ -13,8 +13,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public Material material;
     public int instanceCount = 100;
     private Mesh cubeMesh;
-    private List<Matrix4x4> matrices = new List<Matrix4x4>(); //
-    private List<int> colliderIds = new List<int>(); // 
+    private List<Matrix4x4> matrices = new List<Matrix4x4>();
+    private List<int> colliderIds = new List<int>();
 
     [Header("Box Dimensions")]
     public float width = 1f;
@@ -29,6 +29,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     private int playerID = -1;
     private Vector3 playerVelocity = Vector3.zero;
     private bool isGrounded = false;
+    Vector3 facingDirection = Vector3.right;
 
 
     [Header("Player Combat")]
@@ -38,6 +39,26 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public float playerHitTimer = 0f;
     public float hitStunDuration = 0.3f;
     public float hitStunTimer = 0f;
+
+    [Header("Fireball Settings")]
+    List<Fireball> fireballs = new List<Fireball>();
+    [SerializeField] private bool hasFireball = false;
+    [SerializeField] private float fireballSpeed = 10f;
+
+    public Material fireballMaterial;
+    public float fireballDuration = 10f;   // total time fireball is active
+    private float fireballDurationTimer = 0f;
+    public float fireballLifetime = 3f;
+
+
+    [Tooltip("Time between fireball shots")]
+    public float fireCooldown = 0.3f;
+
+    [Tooltip("Current cooldown timer")]
+    public float fireTimer = 0f;
+
+
+
 
     [Header("Enemy Settings")]
     public int enemyCount = 5;
@@ -61,7 +82,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     }
 
 
-    
+
 
     [Header("End Zone")]
     public Vector3 endZonePosition = new Vector3(20f, 0f, 0f);
@@ -276,8 +297,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
     void Update()
     {
         // Update hit timers
-        if (playerHitTimer > 0) playerHitTimer -= Time.deltaTime;
-        if (hitStunTimer > 0) hitStunTimer -= Time.deltaTime;
+        playerHitTimer = Mathf.Max(0f, playerHitTimer - Time.deltaTime);
+        hitStunTimer = Mathf.Max(0f, hitStunTimer - Time.deltaTime);
 
 
         CheckEndZone();
@@ -285,12 +306,14 @@ public class EnhancedMeshGenerator : MonoBehaviour
         UpdatePlayer();
         RenderBoxes();
         UpdateEnemies();
-
+        //Player picking up power ups
+        CheckPowerupPickup();
         //Powerups rendering
         RenderPowerups();
 
-        //Player picking up power ups
-        CheckPowerupPickup();
+        UpdateFireballs();
+
+
     }
 
     //=========================================================================================================================
@@ -304,21 +327,21 @@ public class EnhancedMeshGenerator : MonoBehaviour
         Matrix4x4 playerMatrix = matrices[colliderIds.IndexOf(playerID)];
         DecomposeMatrix(playerMatrix, out Vector3 pos, out Quaternion rot, out Vector3 scale);
 
-        //Gravity
+        // -------- GRAVITY --------
         if (!isGrounded)
         {
             float gravityScale = playerVelocity.y > 0 ? 9.8f : 4.5f;
             playerVelocity.y -= gravityScale * Time.deltaTime;
         }
 
-        //Jump
+        // -------- JUMP --------
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             playerVelocity.y = 12f;
             isGrounded = false;
         }
 
-        // Get horizontal input
+        // -------- HORIZONTAL INPUT --------
         float horizontal = 0;
         if (hitStunTimer <= 0)
         {
@@ -326,63 +349,81 @@ public class EnhancedMeshGenerator : MonoBehaviour
             if (Input.GetKey(KeyCode.D)) horizontal += 1;
         }
 
-        // Update player position based on input
-        if (!isGrounded)
+        // Update facing direction
+        if (horizontal > 0) facingDirection = Vector3.right;
+        else if (horizontal < 0) facingDirection = Vector3.left;
+
+        // Apply horizontal movement modifier if airborne
+        if (!isGrounded) horizontal *= 0.5f;
+
+        float moveX = (horizontal * movementSpeed + playerVelocity.x) * Time.deltaTime;
+
+        int steps = 5;
+        float stepX = moveX / steps;
+
+        for (int i = 0; i < steps; i++)
         {
-            horizontal *= 0.5f;
+            if (!CheckCollisionAt(playerID, new Vector3(pos.x + stepX, pos.y, pos.z)))
+                pos.x += stepX;
+            else
+                break;
         }
+
+        // -------- VERTICAL MOVEMENT / COLLISION --------
         Vector3 newPos = pos;
-        newPos.x += (horizontal * movementSpeed + playerVelocity.x) * Time.deltaTime;
-
-        // Apply horizontal movement if no collision
-        if (!CheckCollisionAt(playerID, new Vector3(newPos.x, pos.y, pos.z)))
-        {
-            pos.x = newPos.x;
-        }
-
-        // Apply gravity/vertical movement
-        newPos = pos;
         newPos.y += playerVelocity.y * Time.deltaTime;
 
-        // Check for vertical collisions
         if (CheckCollisionAt(playerID, new Vector3(pos.x, newPos.y, pos.z)))
         {
-            // We hit something below or above
-            if (playerVelocity.y < 0)
-            {
-                // We hit something below
-                isGrounded = true;
-            }
+            if (playerVelocity.y < 0) isGrounded = true;
             playerVelocity.y = 0;
         }
         else
         {
-            // No collision, apply gravity
             pos.y = newPos.y;
             isGrounded = false;
         }
 
-        // Update matrix
+        // -------- FIREBALL POWER-UP --------
+
+
+        // Countdown power-up duration
+        if (hasFireball)
+        {
+            fireballDurationTimer -= Time.deltaTime;
+            if (fireballDurationTimer <= 0f)
+            {
+                hasFireball = false;
+                fireballDurationTimer = 0f;
+                Debug.Log("Fireball expired!");
+            }
+        }
+
+        // Countdown fireball cooldown and clamp to 0
+        fireTimer = Mathf.Max(0f, fireTimer - Time.deltaTime);
+
+        // Shoot fireball if ready
+        if (hasFireball && Input.GetKeyDown(KeyCode.F) && fireTimer <= 0f)
+        {
+            ShootFireball(pos);
+            fireTimer = fireCooldown; // reset cooldown
+        }
+
+        // -------- UPDATE PLAYER MATRIX & COLLIDER --------
         Matrix4x4 newMatrix = Matrix4x4.TRS(pos, rot, scale);
         matrices[colliderIds.IndexOf(playerID)] = newMatrix;
 
-        // Update collider position - properly handle rectangular shape
         CollisionManager.Instance.UpdateCollider(playerID, pos, new Vector3(width * scale.x, height * scale.y, depth * scale.z));
         CollisionManager.Instance.UpdateMatrix(playerID, newMatrix);
 
-        // Update camera to follow player
+        // -------- CAMERA FOLLOW --------
         if (cameraFollow != null)
-        {
             cameraFollow.SetPlayerPosition(pos);
-        }
 
+        // -------- HORIZONTAL FRICTION --------
         playerVelocity.x *= 0.9f;
-
-        // Stop very small movement
         if (Mathf.Abs(playerVelocity.x) < 0.01f)
             playerVelocity.x = 0f;
-
-
     }
     void CreatePlayer()
     {
@@ -400,7 +441,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
         playerID = CollisionManager.Instance.RegisterCollider(
             playerPosition,
             new Vector3(width * playerScale.x, height * playerScale.y, depth * playerScale.z),
-            true);
+            false);
 
         // Create transformation matrix
         Matrix4x4 playerMatrix = Matrix4x4.TRS(playerPosition, playerRotation, playerScale);
@@ -626,17 +667,18 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
         Debug.Log($"Adding powerup {randomType} at position: {position}");
 
+        //rotation
         Quaternion rotation = Quaternion.identity;
 
         // Size for Powerups
         Vector3 scale = Vector3.one * Random.Range(0.5f, 1.2f);
 
-        
+        //material
         Material mat = null;
 
         if (randomType == PowerupType.Fireball) //fireball spawn settings
         {
-            scale *= 1.2f; 
+            scale *= 1.2f;
             mat = matFireball;
         }
         else if (randomType == PowerupType.Life) //life spawn settings
@@ -649,19 +691,21 @@ public class EnhancedMeshGenerator : MonoBehaviour
         int id = CollisionManager.Instance.RegisterCollider(
             position,
             new Vector3(width * scale.x, height * scale.y, depth * scale.z),
-            true 
+            true
         );
 
+        // Create transformation matrix
         Matrix4x4 matrix = Matrix4x4.TRS(position, rotation, scale);
+
 
         powerupMatrices.Add(matrix);
         powerupIDs.Add(id);
         powerupMaterials.Add(mat);
 
         // Map to CollisionManager powerupType
-        CollisionManager.PowerupType cmType = (randomType == PowerupType.Fireball) ? 
+        CollisionManager.PowerupType cmType = (randomType == PowerupType.Fireball) ?
             CollisionManager.PowerupType.Fireball : CollisionManager.PowerupType.Life;
-        
+
         CollisionManager.Instance.SetPowerupType(id, cmType);
         CollisionManager.Instance.UpdateMatrix(id, matrix);
     }
@@ -712,6 +756,9 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
                     case CollisionManager.PowerupType.Fireball:
                         Debug.Log("Fireball power-up collected!");
+                        hasFireball = true;                      // enable fireball shooting
+                        fireballDurationTimer = fireballDuration; // start countdown
+                        fireTimer = 0f;                           // reset cooldown so player can shoot immediately
                         break;
                 }
 
@@ -724,9 +771,134 @@ public class EnhancedMeshGenerator : MonoBehaviour
         }
     }
 
+    //=========================================================================================================================
+    // Fireball Logic
+    //=========================================================================================================================\
+    void ShootFireball(Vector3 playerPos)
+    {
+        // Spawn slightly in front of player
+        Vector3 spawnPos = playerPos + facingDirection * (width * 1.5f);
+        Vector3 scale = Vector3.one * 0.5f;
+        spawnPos.y += height * 0.3f;
 
 
+        // Register collider (trigger = true)
+        int id = CollisionManager.Instance.RegisterCollider(
+            spawnPos,
+            new Vector3(width * scale.x, height * scale.y, depth * scale.z),
+            true
+        );
 
+        // Add fireball to tracking lists
+        fireballs.Add(new Fireball(id, facingDirection, fireballLifetime));
+
+        // Create matrix and add to main matrices list
+        Matrix4x4 matrix = Matrix4x4.TRS(spawnPos, Quaternion.identity, scale);
+        matrices.Add(matrix);
+        colliderIds.Add(id);
+
+        // Assign a material if using mesh rendering
+        // Optional: store in fireballMaterials list if needed
+        CollisionManager.Instance.UpdateMatrix(id, matrix);
+        CollisionManager.Instance.UpdateCollider(id, spawnPos, scale);
+
+        Debug.Log("Fireball spawned!");
+
+    }
+
+    void UpdateFireballs()
+    {
+        for (int i = fireballs.Count - 1; i >= 0; i--)
+        {
+            Fireball fb = fireballs[i];
+
+            int index = colliderIds.IndexOf(fb.id);
+            if (index < 0) continue;
+
+            Matrix4x4 mat = matrices[index];
+            Vector3 pos = mat.GetPosition();
+            Vector3 scale = mat.lossyScale;
+
+            // ⏱ lifetime
+            fb.timer -= Time.deltaTime;
+            if (fb.timer <= 0f)
+            {
+                RemoveFireball(i);
+                continue;
+            }
+
+            float move = fireballSpeed * Time.deltaTime;
+            Vector3 nextPos = pos + fb.direction * move;
+
+            bool hit = false;
+
+            for (int j = enemyIDs.Count - 1; j >= 0; j--)
+            {
+                int enemyID = enemyIDs[j];
+
+                if (CollisionManager.Instance.CheckOverlap(
+                    enemyID,
+                    nextPos,
+                    new Vector3(width * scale.x, height * scale.y, depth * scale.z)
+                ))
+                {
+                    Debug.Log("Enemy hit!");
+
+                    RemoveEnemy(enemyID, j);
+                    RemoveFireball(i);
+
+                    hit = true;
+                    break;
+                }
+            }
+
+            if (hit) continue;
+
+            // Move fireball
+            pos = nextPos;
+
+            matrices[index] = Matrix4x4.TRS(pos, Quaternion.identity, scale);
+
+            CollisionManager.Instance.UpdateMatrix(fb.id, matrices[index]);
+            CollisionManager.Instance.UpdateCollider(
+                fb.id,
+                pos,
+                new Vector3(width * scale.x, height * scale.y, depth * scale.z)
+            );
+        }
+    }
+
+    void RemoveFireball(int i)
+    {
+        int id = fireballs[i].id;
+        int index = colliderIds.IndexOf(id);
+
+        if (index >= 0)
+        {
+            matrices.RemoveAt(index);
+            colliderIds.RemoveAt(index);
+        }
+
+        CollisionManager.Instance.RemoveCollider(id);
+
+        fireballs.RemoveAt(i);
+    }
+
+    void RemoveEnemy(int enemyID, int enemyIndex)
+    {
+        int index = colliderIds.IndexOf(enemyID);
+
+        if (index >= 0)
+        {
+            matrices.RemoveAt(index);
+            colliderIds.RemoveAt(index);
+        }
+
+        CollisionManager.Instance.RemoveCollider(enemyID);
+
+        enemyIDs.RemoveAt(enemyIndex);
+        enemyVelocities.Remove(enemyID);
+    }
 
 
 
