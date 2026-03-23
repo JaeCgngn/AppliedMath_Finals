@@ -697,21 +697,10 @@ public class EnhancedMeshGenerator : MonoBehaviour
         for (int i = powerupIDs.Count - 1; i >= 0; i--)
         {
             int powerupID = powerupIDs[i];
-            int powerupIndex = colliderIds.IndexOf(powerupID);
-            if (powerupIndex < 0) continue;
 
-            Vector3 powerupPos = matrices[powerupIndex].GetPosition();
-            Vector3 powerupScale = matrices[powerupIndex].lossyScale;
-
-            //AABB collision check
-            bool overlapX = Mathf.Abs(powerupPos.x - playerPos.x) < (powerupScale.x + playerScale.x) / 2f;
-            bool overlapY = Mathf.Abs(powerupPos.y - playerPos.y) < (powerupScale.y + playerScale.y) / 2f;
-            bool overlapZ = Mathf.Abs(powerupPos.z - playerPos.z) < (powerupScale.z + playerScale.z) / 2f;
-
-            if (overlapX && overlapY && overlapZ)
+            // Use CheckOverlap for triggers
+            if (CollisionManager.Instance.CheckOverlap(powerupID, playerPos, playerScale))
             {
-                // Player collected the power-up
-                Debug.Log("Power-up collected! ID: " + powerupID);
                 CollisionManager.PowerupType type = CollisionManager.Instance.GetPowerupType(powerupID);
 
                 switch (type)
@@ -723,7 +712,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
                     case CollisionManager.PowerupType.Fireball:
                         Debug.Log("Fireball power-up collected!");
-                        // fireball effect here
                         break;
                 }
 
