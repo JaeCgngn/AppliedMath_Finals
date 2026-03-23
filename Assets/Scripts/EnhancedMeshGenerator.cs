@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using UnityEngine;
+using TMPro;
 using Matrix4x4 = UnityEngine.Matrix4x4;
 using Quaternion = UnityEngine.Quaternion;
 using Random = UnityEngine.Random;
@@ -15,6 +16,12 @@ public class EnhancedMeshGenerator : MonoBehaviour
     private Mesh cubeMesh;
     private List<Matrix4x4> matrices = new List<Matrix4x4>();
     private List<int> colliderIds = new List<int>();
+
+
+    [Header("Game Timer")]
+    float gameTimer = 0f;
+    bool isGameRunning = true;
+    public TMP_Text timerText;
 
     [Header("Box Dimensions")]
     public float width = 1f;
@@ -300,6 +307,13 @@ public class EnhancedMeshGenerator : MonoBehaviour
         playerHitTimer = Mathf.Max(0f, playerHitTimer - Time.deltaTime);
         hitStunTimer = Mathf.Max(0f, hitStunTimer - Time.deltaTime);
 
+        if (isGameRunning)
+        {
+            gameTimer += Time.deltaTime;
+            timerText.text = FormatTime(gameTimer);
+        }
+
+
 
         CheckEndZone();
 
@@ -316,6 +330,14 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
     }
 
+    string FormatTime(float time)
+    {
+        int minutes = Mathf.FloorToInt(time / 60f);
+        int seconds = Mathf.FloorToInt(time % 60f);
+
+        return string.Format("{0}:{1:00}", minutes, seconds);
+    }
+
     //=========================================================================================================================
     // Player 
     //=========================================================================================================================
@@ -330,14 +352,31 @@ public class EnhancedMeshGenerator : MonoBehaviour
         // -------- GRAVITY --------
         if (!isGrounded)
         {
-            float gravityScale = playerVelocity.y > 0 ? 9.8f : 4.5f;
-            playerVelocity.y -= gravityScale * Time.deltaTime;
+            if (playerVelocity.y > 0)
+            {
+                // Going UP
+                if (!Input.GetKey(KeyCode.Space))
+                {
+                    // Short hop (release early)
+                    playerVelocity.y -= 20f * Time.deltaTime;
+                }
+                else
+                {
+                    // Normal upward gravity
+                    playerVelocity.y -= 12f * Time.deltaTime;
+                }
+            }
+            else
+            {
+                // Falling (faster)
+                playerVelocity.y -= 25f * Time.deltaTime;
+            }
         }
 
         // -------- JUMP --------
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
-            playerVelocity.y = 12f;
+            playerVelocity.y = 14f;
             isGrounded = false;
         }
 
@@ -964,8 +1003,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
         if (showBoxes) DrawAllBoxesMeshGizmos();
         if (endZoneID != -1) DrawEndZoneGizmos();
     }
-
-
     void DrawGroundMeshGizmos()
     {
         if (matrices.Count == 0) return;
@@ -1008,7 +1045,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
 
     }
-
     void DrawEndZoneGizmos()
     {
         Gizmos.color = Color.magenta;
