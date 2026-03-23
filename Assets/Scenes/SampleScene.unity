@@ -269,10 +269,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ba09889a0c8a50d4ca034bda3689c9fc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  offset: {x: 0, y: -5, z: -10}
+  offset: {x: 0, y: 2, z: -10}
   smoothSpeed: 0.125
   useConstraints: 1
-  xConstraint: {x: -100, y: 100}
+  xConstraint: {x: -100, y: 200}
   yConstraint: {x: -50, y: 100}
   followX: 1
   followY: 1
@@ -1119,21 +1119,22 @@ MonoBehaviour:
   hitStunTimer: 0
   enemyCount: 5
   enemySpeed: 2
-  endZonePosition: {x: 20, y: -15, z: 0}
+  endZonePosition: {x: 200, y: 0, z: 0}
   endZoneSize: {x: 3, y: 20, z: 3}
+  showEndZone: 1
   cameraFollow: {fileID: 0}
   constantZPosition: 0
-  minX: -100
-  maxX: 100
-  minY: -15
-  maxY: -18
-  groundY: -20
-  groundWidth: 200
+  minX: 0
+  maxX: 200
+  minY: 10
+  maxY: 1
+  groundX: 80
+  groundY: 0
+  groundWidth: 240
   groundDepth: 1
   showGround: 1
   showSpawnRange: 1
   showBoxes: 1
-  showEndZone: 1
 --- !u!4 &1548962866
 Transform:
   m_ObjectHideFlags: 0

@@ -49,7 +49,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     [Header("End Zone")]
     public Vector3 endZonePosition = new Vector3(20f, 0f, 0f);
     public Vector3 endZoneSize = new Vector3(3f, 3f, 3f);
-
+    public bool showEndZone = true;
     private int endZoneID = -1;
 
 
@@ -70,6 +70,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
     [Header("Ground Settings")]
     // Ground plane settings
+    public float groundX = 0f;
     public float groundY = -20f;
     public float groundWidth = 200f;
     public float groundDepth = 200f;
@@ -79,7 +80,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public bool showSpawnRange = true;
     public bool showBoxes = true;
 
-    public bool showEndZone = true;
+
 
     void Start()
     {
@@ -100,7 +101,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
         CreateEndZone();
     }
-
     void SetupCamera()
     {
         if (cameraFollow == null)
@@ -133,7 +133,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
             cameraFollow.smoothSpeed = 0.1f;
         }
     }
-
     void CreateCubeMesh() // Create a simple cube mesh with proper dimensions and UVs
     {
         cubeMesh = new Mesh();
@@ -142,16 +141,16 @@ public class EnhancedMeshGenerator : MonoBehaviour
         Vector3[] vertices = new Vector3[8]
         {
                // Bottom face
-    new Vector3(-width/2, -height/2, -depth/2),
-    new Vector3(width/2, -height/2, -depth/2),
-    new Vector3(width/2, -height/2, depth/2),
-    new Vector3(-width/2, -height/2, depth/2),
+                new Vector3(-width/2, -height/2, -depth/2),
+                new Vector3(width/2, -height/2, -depth/2),
+                new Vector3(width/2, -height/2, depth/2),
+                new Vector3(-width/2, -height/2, depth/2),
 
-    // Top face
-    new Vector3(-width/2, height/2, -depth/2),
-    new Vector3(width/2, height/2, -depth/2),
-    new Vector3(width/2, height/2, depth/2),
-    new Vector3(-width/2, height/2, depth/2)
+                // Top face
+                new Vector3(-width/2, height/2, -depth/2),
+                new Vector3(width/2, height/2, -depth/2),
+                new Vector3(width/2, height/2, depth/2),
+                new Vector3(-width/2, height/2, depth/2)
         };
 
         // Triangles for the 6 faces (2 triangles per face)
@@ -194,11 +193,10 @@ public class EnhancedMeshGenerator : MonoBehaviour
         cubeMesh.RecalculateNormals();
         cubeMesh.RecalculateBounds();
     }
-
     void CreateGround()
     {
         // Create a large ground plane
-        Vector3 groundPosition = new Vector3(0, groundY, constantZPosition);
+        Vector3 groundPosition = new Vector3(groundX, groundY, constantZPosition);
         Vector3 groundScale = new Vector3(groundWidth, 1f, groundDepth);
         Quaternion groundRotation = Quaternion.identity;
 
@@ -216,6 +214,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
         // Update the matrix in collision manager
         CollisionManager.Instance.UpdateMatrix(groundID, groundMatrix);
     }
+
 
     void GenerateRandomBoxes()
     {
@@ -254,11 +253,9 @@ public class EnhancedMeshGenerator : MonoBehaviour
             CollisionManager.Instance.UpdateMatrix(id, boxMatrix);
         }
     }
-
     //=========================================================================================================================
     //Update 
     //=========================================================================================================================
-
     void Update()
     {
         // Update hit timers
@@ -272,7 +269,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
         RenderBoxes();
         UpdateEnemies();
     }
-
 
     //=========================================================================================================================
     // Player 
@@ -365,7 +361,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
 
     }
-
     void CreatePlayer()
     {
         // Create player at a specific position
@@ -391,9 +386,14 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
         // Update the matrix in collision manager
         CollisionManager.Instance.UpdateMatrix(playerID, playerMatrix);
-
-
     }
+    void DecomposeMatrix(Matrix4x4 matrix, out Vector3 position, out Quaternion rotation, out Vector3 scale)
+    {
+        position = matrix.GetPosition();
+        rotation = matrix.rotation;
+        scale = matrix.lossyScale;
+    }
+
     //=========================================================================================================================
     // Collisions
     //=========================================================================================================================    
@@ -419,12 +419,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
         }
     }
 
-    void DecomposeMatrix(Matrix4x4 matrix, out Vector3 position, out Quaternion rotation, out Vector3 scale)
-    {
-        position = matrix.GetPosition();
-        rotation = matrix.rotation;
-        scale = matrix.lossyScale;
-    }
 
     //=========================================================================================================================
     // Obstacles
@@ -647,9 +641,6 @@ public class EnhancedMeshGenerator : MonoBehaviour
         // Optional: disable player control
         enabled = false;
     }
-
-
-
     //=========================================================================================================================
     // Debugging Gizmos to visualize spawn area and ground
     //=========================================================================================================================
@@ -660,6 +651,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
         if (showBoxes) DrawAllBoxesMeshGizmos();
         if (endZoneID != -1) DrawEndZoneGizmos();
     }
+
+
     void DrawGroundMeshGizmos()
     {
         if (matrices.Count == 0) return;
@@ -702,6 +695,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
 
     }
+
     void DrawEndZoneGizmos()
     {
         Gizmos.color = Color.magenta;
