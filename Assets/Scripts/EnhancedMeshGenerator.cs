@@ -47,6 +47,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public float hitStunDuration = 0.3f;
     public float hitStunTimer = 0f;
 
+
+
     [Header("Fireball Settings")]
     List<Fireball> fireballs = new List<Fireball>();
     [SerializeField] private bool hasFireball = false;
@@ -97,6 +99,9 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public bool showEndZone = true;
     private int endZoneID = -1;
 
+    [Header("Game Over")]
+    public GameObject gameOverUI;
+    private bool isGameOver = false;
 
     [Header("Camera Settings")]
     // Camera reference
@@ -343,7 +348,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     //=========================================================================================================================
     void UpdatePlayer()
     {
-        if (playerID == -1) return;
+        if (playerID == -1 || isGameOver) return;
 
         // Get current player matrix
         Matrix4x4 playerMatrix = matrices[colliderIds.IndexOf(playerID)];
@@ -463,6 +468,12 @@ public class EnhancedMeshGenerator : MonoBehaviour
         playerVelocity.x *= 0.9f;
         if (Mathf.Abs(playerVelocity.x) < 0.01f)
             playerVelocity.x = 0f;
+
+        // -------- Player Health Check --------
+        if (playerHealth <= 0)
+        {
+            TriggerGameOver();
+        }
     }
     void CreatePlayer()
     {
@@ -489,6 +500,26 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
         // Update the matrix in collision manager
         CollisionManager.Instance.UpdateMatrix(playerID, playerMatrix);
+    }
+
+
+    //=========================================================================================================================
+    // Game OVer Trigger
+    //=========================================================================================================================   
+    public void TriggerGameOver()
+    {
+        isGameOver = true;
+        Debug.Log("Game Over!!!!!");
+
+        playerVelocity = Vector3.zero;
+
+        if(gameOverUI != null)
+        {
+            gameOverUI.SetActive(true);
+        }
+
+        Time.timeScale = 0f;
+
     }
     void DecomposeMatrix(Matrix4x4 matrix, out Vector3 position, out Quaternion rotation, out Vector3 scale)
     {
@@ -938,9 +969,16 @@ public class EnhancedMeshGenerator : MonoBehaviour
         enemyIDs.RemoveAt(enemyIndex);
         enemyVelocities.Remove(enemyID);
     }
-
-
-
+    //=========================================================================================================================
+    // Game Restart
+    //=========================================================================================================================
+    public void RestartGame()
+    {
+        Time.timeScale = 1f;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex
+        );
+    }
     //=========================================================================================================================
     // Ending Objective
     //=========================================================================================================================
