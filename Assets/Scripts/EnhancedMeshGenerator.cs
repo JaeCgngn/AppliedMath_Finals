@@ -37,6 +37,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     private Vector3 playerVelocity = Vector3.zero;
     private bool isGrounded = false;
     Vector3 facingDirection = Vector3.right;
+    public TMP_Text healthText;
 
 
     [Header("Player Combat")]
@@ -74,12 +75,15 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public float enemySpeed = 2f;
     private List<int> enemyIDs = new List<int>();
     private Dictionary<int, Vector3> enemyVelocities = new Dictionary<int, Vector3>();
+    public Material enemyMat;
 
 
     [Header("Powerup Settings")]
 
     public Material matLife;
     public Material matFireball;
+    public Material matShield;
+    public TMP_Text powerupText; 
 
     private List<int> powerupIDs = new List<int>();
     private List<Matrix4x4> powerupMatrices = new List<Matrix4x4>();
@@ -87,10 +91,14 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public enum PowerupType
     {
         Life,
-        Fireball
+        Fireball,
+        Shield
     }
 
-
+    [Header("INvicibility Settings")]
+    public bool hasShield = false;
+    public float shieldDuration = 2f;
+    private float shieldTimer = 0f;
 
 
     [Header("End Zone")]
@@ -98,6 +106,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     public Vector3 endZoneSize = new Vector3(3f, 3f, 3f);
     public bool showEndZone = true;
     private int endZoneID = -1;
+    public GameObject EndPanel;
 
     [Header("Game Over")]
     public GameObject gameOverUI;
@@ -325,6 +334,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
         UpdatePlayer();
         RenderBoxes();
         UpdateEnemies();
+        RenderEnemies();
         //Player picking up power ups
         CheckPowerupPickup();
         //Powerups rendering
@@ -349,6 +359,8 @@ public class EnhancedMeshGenerator : MonoBehaviour
     void UpdatePlayer()
     {
         if (playerID == -1 || isGameOver) return;
+
+        healthText.text = $"Health: {playerHealth}";
 
         // Get current player matrix
         Matrix4x4 playerMatrix = matrices[colliderIds.IndexOf(playerID)];
@@ -453,27 +465,55 @@ public class EnhancedMeshGenerator : MonoBehaviour
             fireTimer = fireCooldown; // reset cooldown
         }
 
-        // -------- UPDATE PLAYER MATRIX & COLLIDER --------
+        // Shield Settings
+        if (hasShield)
+        {
+            shieldTimer -= Time.deltaTime;
+
+            if (shieldTimer <= 0f)
+            {
+                hasShield = false;
+                shieldTimer = 0f;
+                Debug.Log("Shield expired!");
+            }
+        }
+
+        // UPDATE PLAYER MATRIX & COLLIDER 
         Matrix4x4 newMatrix = Matrix4x4.TRS(pos, rot, scale);
         matrices[colliderIds.IndexOf(playerID)] = newMatrix;
 
         CollisionManager.Instance.UpdateCollider(playerID, pos, new Vector3(width * scale.x, height * scale.y, depth * scale.z));
         CollisionManager.Instance.UpdateMatrix(playerID, newMatrix);
 
-        // -------- CAMERA FOLLOW --------
+        // CAMERA FOLLOW 
         if (cameraFollow != null)
             cameraFollow.SetPlayerPosition(pos);
 
-        // -------- HORIZONTAL FRICTION --------
+        // HORIZONTAL FRICTION 
         playerVelocity.x *= 0.9f;
         if (Mathf.Abs(playerVelocity.x) < 0.01f)
             playerVelocity.x = 0f;
 
-        // -------- Player Health Check --------
+        //  Player Health Check 
         if (playerHealth <= 0)
         {
             TriggerGameOver();
         }
+
+        // power up UI 
+        string text = "";
+
+        if (hasFireball)
+        {
+            text += "Fireball: " + fireballDurationTimer.ToString("F1") + "s\n";
+        }
+
+        if (hasShield)
+        {
+            text += "Shield: " + shieldTimer.ToString("F1") + "s\n";
+        }
+
+        powerupText.text = text;
     }
     void CreatePlayer()
     {
@@ -662,10 +702,11 @@ public class EnhancedMeshGenerator : MonoBehaviour
                 Vector3 playerPos = matrices[colliderIds.IndexOf(playerID)].GetPosition();
                 Vector3 playerScale = matrices[colliderIds.IndexOf(playerID)].lossyScale;
 
-                if (IsCollidingWithPlayer(id))
+                if (IsCollidingWithPlayer(id) && !hasShield)
                 {
                     // Damage the player
                     playerHealth--;
+
                     Debug.Log("Player hit! Health: " + playerHealth);
 
                     // Knockback (bounce back)
@@ -680,6 +721,26 @@ public class EnhancedMeshGenerator : MonoBehaviour
             }
         }
     }
+
+    void RenderEnemies()
+    {
+        List<Matrix4x4> enemyMatricesToDraw = new List<Matrix4x4>();
+
+        foreach (int id in enemyIDs)
+        {
+            int index = colliderIds.IndexOf(id);
+            if (index < 0) continue;
+
+            enemyMatricesToDraw.Add(matrices[index]);
+        }
+
+        if (enemyMatricesToDraw.Count > 0)
+        {
+            Graphics.DrawMeshInstanced(cubeMesh, 0, enemyMat, enemyMatricesToDraw.ToArray());
+        }
+    }
+
+
     void ApplyPlayerKnockback(Vector3 velocity)
     {
         if (playerID == -1) return;
@@ -748,13 +809,18 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
         if (randomType == PowerupType.Fireball) //fireball spawn settings
         {
-            scale *= 1.2f;
+            scale *= 1f;
             mat = matFireball;
         }
         else if (randomType == PowerupType.Life) //life spawn settings
         {
-            scale *= 1.2f;
+            scale *= 1f;
             mat = matLife;
+        }
+        else if (randomType == PowerupType.Shield)
+        {
+            scale *= 1f;
+            mat = matShield;
         }
 
         // Register collider
@@ -773,8 +839,26 @@ public class EnhancedMeshGenerator : MonoBehaviour
         powerupMaterials.Add(mat);
 
         // Map to CollisionManager powerupType
-        CollisionManager.PowerupType cmType = (randomType == PowerupType.Fireball) ?
-            CollisionManager.PowerupType.Fireball : CollisionManager.PowerupType.Life;
+        CollisionManager.PowerupType cmType;
+
+        switch (randomType)
+        {
+            case PowerupType.Fireball:
+                cmType = CollisionManager.PowerupType.Fireball;
+                break;
+
+            case PowerupType.Life:
+                cmType = CollisionManager.PowerupType.Life;
+                break;
+
+            case PowerupType.Shield:
+                cmType = CollisionManager.PowerupType.Shield;
+                break;
+
+            default:
+                cmType = CollisionManager.PowerupType.Life;
+                break;
+        }
 
         CollisionManager.Instance.SetPowerupType(id, cmType);
         CollisionManager.Instance.UpdateMatrix(id, matrix);
@@ -785,17 +869,27 @@ public class EnhancedMeshGenerator : MonoBehaviour
         // Batch Life power-ups
         List<Matrix4x4> lifeMatrices = new List<Matrix4x4>();
         List<Matrix4x4> fireballMatrices = new List<Matrix4x4>();
+        List<Matrix4x4> shieldMatrices = new List<Matrix4x4>();
 
         for (int i = 0; i < powerupIDs.Count; i++)
         {
             if (powerupMaterials[i] == matLife)
+            {
                 lifeMatrices.Add(powerupMatrices[i]);
-            else
+            }
+            else if (powerupMaterials[i] == matFireball)
+            {
                 fireballMatrices.Add(powerupMatrices[i]);
+            }
+            else if (powerupMaterials[i] == matShield)
+            {
+                shieldMatrices.Add(powerupMatrices[i]);
+            }
         }
 
         Graphics.DrawMeshInstanced(cubeMesh, 0, matLife, lifeMatrices.ToArray());
         Graphics.DrawMeshInstanced(cubeMesh, 0, matFireball, fireballMatrices.ToArray());
+        Graphics.DrawMeshInstanced(cubeMesh, 0, matShield, shieldMatrices.ToArray());
     }
 
     //Checking the colliders of power up to player
@@ -807,12 +901,11 @@ public class EnhancedMeshGenerator : MonoBehaviour
         Vector3 playerPos = matrices[playerIndex].GetPosition();
         Vector3 playerScale = matrices[playerIndex].lossyScale;
 
-        // Use a reverse loop because we may remove items
         for (int i = powerupIDs.Count - 1; i >= 0; i--)
         {
             int powerupID = powerupIDs[i];
 
-            // Use CheckOverlap for triggers
+            // Using CheckOverlap for triggers
             if (CollisionManager.Instance.CheckOverlap(powerupID, playerPos, playerScale))
             {
                 CollisionManager.PowerupType type = CollisionManager.Instance.GetPowerupType(powerupID);
@@ -826,9 +919,15 @@ public class EnhancedMeshGenerator : MonoBehaviour
 
                     case CollisionManager.PowerupType.Fireball:
                         Debug.Log("Fireball power-up collected!");
-                        hasFireball = true;                      // enable fireball shooting
+                        hasFireball = true; // enable fireball shooting
                         fireballDurationTimer = fireballDuration; // start countdown
-                        fireTimer = 0f;                           // reset cooldown so player can shoot immediately
+                        fireTimer = 0f; // reset cooldown so player can shoot immediately
+                        break;
+
+                    case CollisionManager.PowerupType.Shield: 
+                        Debug.Log("Shield power-up collected!");
+                        hasShield = true;
+                        shieldTimer = shieldDuration;
                         break;
                 }
 
@@ -1024,6 +1123,7 @@ public class EnhancedMeshGenerator : MonoBehaviour
     void EndGame()
     {
         Debug.Log("🎉 Level Complete!");
+        EndPanel.SetActive(true);
 
         // Stop time
         Time.timeScale = 0f;

@@ -50,7 +50,7 @@ public class CollisionManager : MonoBehaviour
     private Dictionary<int, PowerupType> powerupTypes = new Dictionary<int, PowerupType>();
         public enum PowerupType
     {
-        Life, Fireball
+        Life, Fireball, Shield
     }
     private static CollisionManager _instance;
     public static CollisionManager Instance
